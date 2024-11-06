@@ -1,7 +1,8 @@
 # Docs for the Azure Web Apps Deploy action: https://github.com/azure/functions-action
 # More GitHub Actions for Azure: https://github.com/Azure/actions
+# More info on Python, GitHub Actions, and Azure Functions: https://aka.ms/python-webapps-actions
 
-name: Build and deploy Node.js project to Azure Function App - ecommerce-functions-app
+name: Build and deploy Python project to Azure Function App - ecommerce-functions-app
 
 on:
   push:
@@ -11,28 +12,29 @@ on:
 
 env:
   AZURE_FUNCTIONAPP_PACKAGE_PATH: '.' # set this to the path to your web app project, defaults to the repository root
-  NODE_VERSION: '20.x' # set this to the node version to use (supports 8.x, 10.x, 12.x)
+  PYTHON_VERSION: '3.11' # set this to the python version to use (supports 3.6, 3.7, 3.8)
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: 'Checkout GitHub Action'
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node ${{ env.NODE_VERSION }} Environment
-        uses: actions/setup-node@v3
+      - name: Setup Python version
+        uses: actions/setup-python@v5
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: 'Resolve Project Dependencies Using Npm'
-        shell: bash
+      - name: Create and start virtual environment
         run: |
-          pushd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-          npm install
-          npm run build --if-present
-          npm run test --if-present
-          popd
+          python -m venv venv
+          source venv/bin/activate
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Optional: Add step to run tests here
 
       - name: Zip artifact for deployment
         run: zip release.zip ./* -r
@@ -40,8 +42,10 @@ jobs:
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
-          name: node-app
-          path: release.zip
+          name: python-app
+          path: |
+            release.zip
+            !venv/
 
   deploy:
     runs-on: ubuntu-latest
@@ -54,21 +58,21 @@ jobs:
       - name: Download artifact from build job
         uses: actions/download-artifact@v4
         with:
-          name: node-app
+          name: python-app
 
       - name: Unzip artifact for deployment
-        run: unzip release.zip
-      
+        run: unzip release.zip     
+        
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_E53E27EA8ACC4F7B8DB78447EF1E5BD8 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_378100C1A7744CA4A5FCA9748A9DBCFC }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_B22B3518514B4E8395C10A753C4CB3A6 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_348FFE69594F41D88237C30A7186AD79 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_50F28A2651B04D459A47DA89727CC164 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_3228C30A72524773A9E35281BB032EA5 }}
 
-      - name: 'Run Azure Functions Action'
+      - name: 'Deploy to Azure Functions'
         uses: Azure/functions-action@v1
-        id: fa
+        id: deploy-to-function
         with:
           app-name: 'ecommerce-functions-app'
           slot-name: 'Production'
